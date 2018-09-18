@@ -1,0 +1,22 @@
+-------------------------------------------------
+Molecule Name: Cl2
+-------------------------------------------------
+Simulation Parameters
+1000        Total time (ps)
+0.01        Time step (ps)
+10.0        Box size (Angstrom)
+0.05        Coordinate/energy write frequency (ps)
+-------------------------------------------------
+Atom Data
+2           Number of atoms
+T           Add small random displacement (T/F)
+Name    Mass    X        Y        Z
+Cl1     35.0    0.0      0.0      0.0
+Cl2     35.0    2.0      0.0      0.0
+-------------------------------------------------
+Harmonic Bond Data
+1           Number of bonds
+Name1    Name2    R0(Angstrom)    K(Nm^-1)
+Cl1      Cl2      2.0             100.0
+-------------------------------------------------
+
