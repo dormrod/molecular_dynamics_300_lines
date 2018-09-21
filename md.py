@@ -6,7 +6,9 @@ Please Modify!
 """
 from __future__ import print_function
 import os
+import sys
 import numpy as np
+
 
 # Global variables for unit conversions
 hartree = 4.35974465e-18   # J, atomic unit of energy
@@ -20,10 +22,67 @@ hbar = 6.626070040e-34     # Js
 atomic_time = hbar/hartree
 
 
+def display_header():
+    """Write opening message to screen"""
+
+    print_dotted_line()
+    print("Welcome to the Theoretically Speaking molecular dynamics code")
+    print_dotted_line()
+
+
+def print_dotted_line(length = 65):
+    """Write --- line of given length to screen"""
+
+    line = "-" * length
+    print(line)
+
+
+def get_input_parameters():
+    """Ask user for input file name, read input parameters and store in dictionary"""
+
+    # Get list of available input files
+    input_files = get_recursive_file_list("inpt")
+
+    # Ask user to select input file from list
+    if len(input_files) == 0: # If cannot find any input files close program
+        print("No available input files. Exiting.")
+        sys.exit()
+    else:
+        while True:
+            print("Select an input file from the list:")
+            for i, file in enumerate(input_files):
+                print("[{0}]  {1}".format(i,file))
+            try:
+                user_selection = int(input())
+                input_file=input_files[user_selection]
+                print("Input file: {0} selected".format(input_file))
+                print_dotted_line()
+                break
+            except: pass
+
+
+def get_recursive_file_list(ext):
+    """Get list of files with specifed extension in current directory and all subdirectories"""
+
+    # Search over all files in all subdirectories, add to list if have required extension
+    files = []
+    for dirpath, dirname, filenames in os.walk("./"):
+        for filename in filenames:
+            if filename.endswith(ext):
+                filepath = os.path.join(dirpath,filename)
+                files.append(filepath)
+    return files
+
+
 def main():
     """Handle input/output and molecular dynamics velocity-verlet algorithm"""
 
-    print("hello")
+    # Display opening message
+    display_header()
+
+    # Read user parameters from input file
+    input_parameters = get_input_parameters()
+
 
 # Execute code if main file
 if __name__ == "__main__":
