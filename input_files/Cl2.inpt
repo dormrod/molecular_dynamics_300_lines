@@ -9,7 +9,8 @@ Simulation Parameters
 -------------------------------------------------
 Atom Data
 2           Number of atoms
-T           Add small random displacement (T/F)
+T           Add small initial random displacement (T/F)
+1.0         Maximum displacement (Angstrom)
 Name    Mass    X        Y        Z
 Cl1     35.0    0.0      0.0      0.0
 Cl2     35.0    2.0      0.0      0.0

@@ -91,14 +91,15 @@ def get_input_parameters():
         # Atom data
         try:
             for i in range(2): file.readline()
-            n_atoms = parameters["n_atoms"] = int(file.readline().split()[0])
+            num_atoms = parameters["num_atoms"] = int(file.readline().split()[0])
             parameters["random_displacement"] = string_to_boolean(file.readline().split()[0])
+            parameters["random_displacement_limit"] = float(file.readline().split()[0]) / bohr
             file.readline() # skip comment
             name_to_index = {}  # dictionary to convert atom name to array index
             parameters["atom_names"] = []  # empty list for names
-            parameters["atom_masses"] = np.empty(n_atoms)  # empty array for masses
-            parameters["atom_crds"] = np.empty([n_atoms, 3])  # empty array for coordinates
-            for i in range(n_atoms):
+            parameters["atom_masses"] = np.empty(num_atoms)  # empty array for masses
+            parameters["atom_crds"] = np.empty([num_atoms, 3])  # empty array for coordinates
+            for i in range(num_atoms):
                 line = file.readline().split()
                 name_to_index[line[0]] = i
                 parameters["atom_names"].append(line[0])
@@ -111,11 +112,11 @@ def get_input_parameters():
         # Bond Data
         try:
             for i in range(2): file.readline()
-            n_bonds = parameters["n_bonds"] = int(file.readline().split()[0])
+            num_bonds = parameters["num_bonds"] = int(file.readline().split()[0])
             file.readline() # skip comment
-            parameters["bond_pairs"] = np.empty([n_bonds, 2], dtype=int) # empty array for indices of bonded atom pairs
-            parameters["bond_params"] = np.empty([n_bonds, 2]) # empty array for harmonic bond r0 and k
-            for i in range(n_bonds):
+            parameters["bond_pairs"] = np.empty([num_bonds, 2], dtype=int) # empty array for indices of bonded atom pairs
+            parameters["bond_params"] = np.empty([num_bonds, 2]) # empty array for harmonic bond r0 and k
+            for i in range(num_bonds):
                 line = file.readline().split()
                 parameters["bond_pairs"][i, 0] = name_to_index[line[0]]
                 parameters["bond_pairs"][i, 1] = name_to_index[line[1]]
@@ -142,11 +143,26 @@ def get_recursive_file_list(ext):
                 files.append(filepath)
     return files
 
+
 def apply_periodic_boundary_condition(crds, box_size):
     """Apply periodicity to keep atoms within simulation box"""
+
     crds[crds < 0.0] += box_size
     crds[crds > box_size] -= box_size
     return crds
+
+
+def initialise_coordinates(crds, box_size, displace, limit):
+    """Recentre atoms in simulation box, apply periodic boundary, apply random displacement"""
+
+    crds += box_size/2.0
+    crds = apply_periodic_boundary_condition(crds, box_size)
+    if displace:
+        displacements = np.random.uniform(low = -limit, high = limit, size = crds.shape)
+        crds += displacements
+    return crds
+
+
 
 def main():
     """Handle input/output and molecular dynamics velocity-verlet algorithm"""
@@ -156,6 +172,25 @@ def main():
 
     # Read user parameters from input file
     input_parameters = get_input_parameters()
+
+    # Unpack parameters
+    time_total = input_parameters["time_total"]
+    time_step = input_parameters["time_step"]
+    box_size = input_parameters["box_size"]
+    write_freq = input_parameters["write_freq"]
+    num_atoms = input_parameters["num_atoms"]
+    displace_atoms = input_parameters["random_displacement"]
+    displacement_limit = input_parameters["random_displacement_limit"]
+    atom_names = input_parameters["atom_names"]
+    atom_masses = input_parameters["atom_masses"]
+    atom_crds = input_parameters["atom_crds"]
+    num_bonds = input_parameters["num_bonds"]
+    bond_pairs = input_parameters["bond_pairs"]
+    bond_params = input_parameters["bond_params"]
+
+    # Recentre coordinates and apply displacements
+    atom_crds = initialise_coordinates(atom_crds, box_size, displace_atoms, displacement_limit)
+
 
 
 # Execute code if main file
