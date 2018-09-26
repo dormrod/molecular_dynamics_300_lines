@@ -25,16 +25,27 @@ atomic_time = hbar/hartree
 def display_header():
     """Write opening message to screen"""
 
-    print_dotted_line()
+    print_dashed_line()
     print("Welcome to the Theoretically Speaking molecular dynamics code")
-    print_dotted_line()
+    print_dashed_line()
 
 
-def print_dotted_line(length = 65):
+def print_dashed_line(length = 65):
     """Write --- line of given length to screen"""
 
     line = "-" * length
     print(line)
+
+
+def string_to_boolean(string):
+    """Converts input string of True or False to a boolean True or False"""
+
+    string = string.lower().strip()
+    true_strings = ["true", "t"]
+    false_strings = ["false", "f"]
+    if string in true_strings: return True
+    elif string in false_strings: return False
+    raise ValueError("Bad Boolean Value: " + string)
 
 
 def get_input_parameters():
@@ -54,11 +65,69 @@ def get_input_parameters():
                 print("[{0}]  {1}".format(i,file))
             try:
                 user_selection = int(input())
-                input_file=input_files[user_selection]
-                print("Input file: {0} selected".format(input_file))
-                print_dotted_line()
+                input_file = input_files[user_selection]
+                print("Input file selected: {0}".format(input_file))
+                print_dashed_line()
                 break
             except: pass
+
+    # Open input file and read parameters into dictionary
+    parameters = {}
+    with open(input_file, "r") as file:
+        print("Reading input file")
+        # Skip header
+        for i in range(2): file.readline()
+        # Simulation parameters
+        try:
+            for i in range(2): file.readline()
+            parameters["time_total"] = float(file.readline().split()[0]) / (atomic_time * 1e12)
+            parameters["time_step"] = float(file.readline().split()[0]) / (atomic_time * 1e12)
+            parameters["box_size"] = float(file.readline().split()[0]) / bohr
+            parameters["write_freq"] = float(file.readline().split()[0]) / (atomic_time * 1e12)
+            print("  - Simulation parameters read")
+        except:
+            print("Error in simulation parameters")
+            sys.exit()
+        # Atom data
+        try:
+            for i in range(2): file.readline()
+            n_atoms = parameters["n_atoms"] = int(file.readline().split()[0])
+            parameters["random_displacement"] = string_to_boolean(file.readline().split()[0])
+            file.readline() # skip comment
+            name_to_index = {}  # dictionary to convert atom name to array index
+            parameters["atom_names"] = []  # empty list for names
+            parameters["atom_masses"] = np.empty(n_atoms)  # empty array for masses
+            parameters["atom_crds"] = np.empty([n_atoms, 3])  # empty array for coordinates
+            for i in range(n_atoms):
+                line = file.readline().split()
+                name_to_index[line[0]] = i
+                parameters["atom_names"].append(line[0])
+                parameters["atom_masses"][i] = float(line[1]) / (avo * emass)
+                parameters["atom_crds"][i] = np.array(line[2:5], dtype = float) / bohr
+            print("  - Atom data read")
+        except:
+            print("Error in atom data")
+            sys.exit()
+        # Bond Data
+        try:
+            for i in range(2): file.readline()
+            n_bonds = parameters["n_bonds"] = int(file.readline().split()[0])
+            file.readline() # skip comment
+            parameters["bond_pairs"] = np.empty([n_bonds, 2], dtype=int) # empty array for indices of bonded atom pairs
+            parameters["bond_params"] = np.empty([n_bonds, 2]) # empty array for harmonic bond r0 and k
+            for i in range(n_bonds):
+                line = file.readline().split()
+                parameters["bond_pairs"][i, 0] = name_to_index[line[0]]
+                parameters["bond_pairs"][i, 1] = name_to_index[line[1]]
+                parameters["bond_params"][i, 0] = float(line[2]) / bohr
+                parameters["bond_params"][i, 1] = float(line[3]) * (bohr * 1e-10)**2 / hartree
+            print("  - Bond data read")
+        except:
+            print("Error in bond data")
+            sys.exit()
+        print("Read successful")
+        print_dashed_line()
+    return parameters
 
 
 def get_recursive_file_list(ext):
@@ -73,6 +142,11 @@ def get_recursive_file_list(ext):
                 files.append(filepath)
     return files
 
+def apply_periodic_boundary_condition(crds, box_size):
+    """Apply periodicity to keep atoms within simulation box"""
+    crds[crds < 0.0] += box_size
+    crds[crds > box_size] -= box_size
+    return crds
 
 def main():
     """Handle input/output and molecular dynamics velocity-verlet algorithm"""
