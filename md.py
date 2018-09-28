@@ -21,6 +21,10 @@ bohr = 0.52917721067       # Angstroms
 hbar = 6.626070040e-34     # Js
 atomic_time = hbar/hartree
 
+# Global files to prevent constant opening/closing
+xyz_file = open("coordinates.xyz", "w")
+energy_file = open("energies.dat", "w")
+
 
 def display_header():
     """Write opening message to screen"""
@@ -152,6 +156,15 @@ def apply_periodic_boundary_condition(crds, box_size):
     return crds
 
 
+def minimum_image_displacement(crd_0, crd_1, box_size):
+    """Find displacement between nearest periodic images of atom pair"""
+
+    displacement = crd_0 - crd_1
+    displacement[displacement < -box_size / 2] += box_size
+    displacement[displacement > box_size / 2] -= box_size
+    return displacement
+
+
 def initialise_coordinates(crds, box_size, displace, limit):
     """Recentre atoms in simulation box, apply periodic boundary, apply random displacement"""
 
@@ -162,6 +175,38 @@ def initialise_coordinates(crds, box_size, displace, limit):
         crds += displacements
     return crds
 
+
+def update_accelerations(masses, crds, bond_pairs, bond_params, box_size):
+    """Calculate the acceleration on each atom using potential model and Newton's laws of motion"""
+
+    # Calculate forces using Hooke's law: F=-k(r-r0)
+    # Convert to acceleration using Newton's laws: F=ma, action has opposite reaction
+    accelerations = np.zeros_like(crds)  # x,y,z accelerations for each atom
+    for i, bond in enumerate(bond_pairs):
+        atom_0, atom_1 = bond[0], bond[1]
+        displacement = minimum_image_displacement(crds[atom_0, :], crds[atom_1, :], box_size)
+        distance = np.linalg.norm(displacement)
+        force_direction = displacement / distance
+        force_magnitude = - bond_params[i, 1] * (distance - bond_params[i, 0])
+        force = force_magnitude * force_direction
+        accelerations[atom_0] += force / masses[atom_0]
+        accelerations[atom_1] -= force / masses[atom_1]
+    return accelerations
+
+
+def write_output_files(time, num_atoms, names, crds, energies):
+    """Writes coordinates in XYZ file type to 'coordinates.xyz'
+    Write kinetic, potential and total energies to 'energies.dat'"""
+
+    # Write XYZ file
+    xyz_file.write("{0}  \n\n".format(num_atoms))
+    for i, xyz in enumerate(crds):
+        xyz *= bohr
+        xyz_file.write("{0}  {1:.6f}  {2:.6f}  {3:.6f}".format(names[i], xyz[0], xyz[1], xyz[2]))
+
+    # Write energies
+    energies *= energies * 1e3 * hartree
+    energy_file.write("{0}  {1}  {2}  {3}".format(time, energies[0], energies[1], energies[2]))
 
 
 def main():
@@ -192,6 +237,23 @@ def main():
     atom_crds = initialise_coordinates(atom_crds, box_size, displace_atoms, displacement_limit)
 
 
+    # Initialise Molecular Dynamics Variables
+    num_steps = int(time_total / time_step)  # total number of steps of md
+    write_steps = int(write_freq / time_step)  # number of steps to write out results
+    atom_vels = np.zeros_like(atom_crds)  # velocities in x,y,z directions for all atoms
+    system_energy = np.zeros(3)  # kinetic, potential and total energy
+    atom_acc_start = atom_acc_end = np.zeros_like(atom_crds)  # accelerations at start and end of time step
+    atom_acc_end = update_accelerations(atom_masses, atom_crds, bond_pairs, bond_params, box_size)
+
+    print(atom_acc_end)
+
+    # Molecular dynamics
+    # for step in range(1, num_steps+1):
+
+
+
+
+    # print(num_steps, write_steps)
 
 # Execute code if main file
 if __name__ == "__main__":
