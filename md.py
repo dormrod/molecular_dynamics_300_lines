@@ -19,7 +19,7 @@ emass = 9.109534e-28       # g, atomic unit of mass
 boltz = 1.38064852e-23 / hartree    # E_h K^-1
 bohr = 0.52917721067       # Angstroms
 hbar = 6.626070040e-34     # Js
-atomic_time = hbar/hartree
+atomic_time = hbar / hartree  
 
 # Global files to prevent constant opening/closing
 xyz_file = open("coordinates.xyz", "w")
@@ -176,6 +176,22 @@ def initialise_coordinates(crds, box_size, displace, limit):
     return crds
 
 
+def calculate_energy(masses, crds, velocities, bond_pairs, bond_params, box_size):
+    """Calculate kinetic, potential and total energy of system"""
+
+    kinetic_energy = 0.5 * (masses * np.sum(velocities**2, axis=1)).sum()  # U=0.5*m*v^2
+
+    # Calculate harmonic potential energy using: U=0.5*k(r-r0)^2
+    for i, bond in enumerate(bond_pairs):
+        atom_0, atom_1 = bond[0], bond[1]
+        displacement = minimum_image_displacement(crds[atom_0, :], crds[atom_1, :], box_size)
+        distance = np.linalg.norm(displacement)
+        potential_energy = 0.5 * bond_params[i, 1] * (distance - bond_params[i, 0])**2
+
+    total_energy = kinetic_energy + potential_energy  # Total energy as sum of ke and pe
+    return np.array([kinetic_energy, potential_energy, total_energy])
+
+
 def update_accelerations(masses, crds, bond_pairs, bond_params, box_size):
     """Calculate the acceleration on each atom using potential model and Newton's laws of motion"""
 
@@ -194,7 +210,7 @@ def update_accelerations(masses, crds, bond_pairs, bond_params, box_size):
     return accelerations
 
 
-def write_output_files(time, num_atoms, names, crds, energies):
+def write_output_files(time_step, num_atoms, names, crds, energies):
     """Writes coordinates in XYZ file type to 'coordinates.xyz'
     Write kinetic, potential and total energies to 'energies.dat'"""
 
@@ -202,11 +218,11 @@ def write_output_files(time, num_atoms, names, crds, energies):
     xyz_file.write("{0}  \n\n".format(num_atoms))
     for i, xyz in enumerate(crds):
         xyz *= bohr
-        xyz_file.write("{0}  {1:.6f}  {2:.6f}  {3:.6f}".format(names[i], xyz[0], xyz[1], xyz[2]))
+        xyz_file.write("{0}  {1:.6f}  {2:.6f}  {3:.6f}  \n".format(names[i], xyz[0], xyz[1], xyz[2]))
 
     # Write energies
     energies *= energies * 1e3 * hartree
-    energy_file.write("{0}  {1}  {2}  {3}".format(time, energies[0], energies[1], energies[2]))
+    energy_file.write("{0}  {1}  {2}  {3}  \n".format(time_step, energies[0], energies[1], energies[2]))
 
 
 def main():
@@ -229,26 +245,26 @@ def main():
     atom_names = input_parameters["atom_names"]
     atom_masses = input_parameters["atom_masses"]
     atom_crds = input_parameters["atom_crds"]
-    num_bonds = input_parameters["num_bonds"]
     bond_pairs = input_parameters["bond_pairs"]
     bond_params = input_parameters["bond_params"]
 
     # Recentre coordinates and apply displacements
     atom_crds = initialise_coordinates(atom_crds, box_size, displace_atoms, displacement_limit)
 
-
     # Initialise Molecular Dynamics Variables
     num_steps = int(time_total / time_step)  # total number of steps of md
     write_steps = int(write_freq / time_step)  # number of steps to write out results
     atom_vels = np.zeros_like(atom_crds)  # velocities in x,y,z directions for all atoms
-    system_energy = np.zeros(3)  # kinetic, potential and total energy
     atom_acc_start = atom_acc_end = np.zeros_like(atom_crds)  # accelerations at start and end of time step
-    atom_acc_end = update_accelerations(atom_masses, atom_crds, bond_pairs, bond_params, box_size)
+    atom_acc_end = update_accelerations(atom_masses, atom_crds, bond_pairs, bond_params, box_size)  # calculate initial accelerations
+    system_energy = calculate_energy(atom_masses, atom_crds, atom_vels, bond_pairs, bond_params, box_size)  # calculate initial energies
+    write_output_files(0, num_atoms, atom_names, atom_crds, system_energy)
 
-    print(atom_acc_end)
 
     # Molecular dynamics
+    # print("Performing molecular dynamics simulation")
     # for step in range(1, num_steps+1):
+
 
 
 
