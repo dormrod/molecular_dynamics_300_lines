@@ -19,7 +19,7 @@ emass = 9.109534e-28       # g, atomic unit of mass
 boltz = 1.38064852e-23 / hartree    # E_h K^-1
 bohr = 0.52917721067       # Angstroms
 hbar = 6.626070040e-34     # Js
-atomic_time = hbar / hartree  
+atomic_time = hbar / hartree
 
 # Global files to prevent constant opening/closing
 xyz_file = open("coordinates.xyz", "w")
@@ -151,7 +151,7 @@ def get_recursive_file_list(ext):
 def apply_periodic_boundary_condition(crds, box_size):
     """Apply periodicity to keep atoms within simulation box"""
 
-    crds[crds < 0.0] += box_size
+    crds[crds < 0] += box_size
     crds[crds > box_size] -= box_size
     return crds
 
@@ -168,7 +168,7 @@ def minimum_image_displacement(crd_0, crd_1, box_size):
 def initialise_coordinates(crds, box_size, displace, limit):
     """Recentre atoms in simulation box, apply periodic boundary, apply random displacement"""
 
-    crds += box_size/2.0
+    crds += box_size / 2
     crds = apply_periodic_boundary_condition(crds, box_size)
     if displace:
         displacements = np.random.uniform(low = -limit, high = limit, size = crds.shape)
@@ -179,14 +179,14 @@ def initialise_coordinates(crds, box_size, displace, limit):
 def calculate_energy(masses, crds, velocities, bond_pairs, bond_params, box_size):
     """Calculate kinetic, potential and total energy of system"""
 
-    kinetic_energy = 0.5 * (masses * np.sum(velocities**2, axis=1)).sum()  # U=0.5*m*v^2
+    kinetic_energy = 0.5 * (masses * np.sum(velocities ** 2, axis=1)).sum()  # U=0.5*m*v^2
 
     # Calculate harmonic potential energy using: U=0.5*k(r-r0)^2
     for i, bond in enumerate(bond_pairs):
         atom_0, atom_1 = bond[0], bond[1]
         displacement = minimum_image_displacement(crds[atom_0, :], crds[atom_1, :], box_size)
         distance = np.linalg.norm(displacement)
-        potential_energy = 0.5 * bond_params[i, 1] * (distance - bond_params[i, 0])**2
+        potential_energy = 0.5 * bond_params[i, 1] * (distance - bond_params[i, 0]) ** 2
 
     total_energy = kinetic_energy + potential_energy  # Total energy as sum of ke and pe
     return np.array([kinetic_energy, potential_energy, total_energy])
@@ -210,19 +210,34 @@ def update_accelerations(masses, crds, bond_pairs, bond_params, box_size):
     return accelerations
 
 
+def update_coordinates(crds, accelerations, velocities, time_step, box_size):
+    """Update coordinates using: x(t+dt)=x(t)+v(t)*dt+0.5*a(t)*dt**2"""
+
+    crds += velocities * time_step + 0.5 * accelerations * time_step ** 2
+    crds = apply_periodic_boundary_condition(crds, box_size)
+    return crds
+
+
+def update_velocities(velocities, accelerations_start, accelerations_end, time_step):
+    """Update velocities using: v(t+dt)=v(t)+0.5*dt*(a(t)+a(t+dt))"""
+
+    velocities += 0.5 * time_step * (accelerations_start + accelerations_end)
+    return velocities
+
+
 def write_output_files(time_step, num_atoms, names, crds, energies):
     """Writes coordinates in XYZ file type to 'coordinates.xyz'
     Write kinetic, potential and total energies to 'energies.dat'"""
 
     # Write XYZ file
     xyz_file.write("{0}  \n\n".format(num_atoms))
-    for i, xyz in enumerate(crds):
-        xyz *= bohr
+    for i, crd in enumerate(crds):
+        xyz = crd * bohr
         xyz_file.write("{0}  {1:.6f}  {2:.6f}  {3:.6f}  \n".format(names[i], xyz[0], xyz[1], xyz[2]))
 
     # Write energies
-    energies *= energies * 1e3 * hartree
-    energy_file.write("{0}  {1}  {2}  {3}  \n".format(time_step, energies[0], energies[1], energies[2]))
+    energy = energies * 1e3 * hartree
+    energy_file.write("{0}  {1}  {2}  {3}  \n".format(time_step, energy[0], energy[1], energy[2]))
 
 
 def main():
@@ -256,20 +271,27 @@ def main():
     write_steps = int(write_freq / time_step)  # number of steps to write out results
     atom_vels = np.zeros_like(atom_crds)  # velocities in x,y,z directions for all atoms
     atom_acc_start = atom_acc_end = np.zeros_like(atom_crds)  # accelerations at start and end of time step
-    atom_acc_end = update_accelerations(atom_masses, atom_crds, bond_pairs, bond_params, box_size)  # calculate initial accelerations
+    atom_acc_start = update_accelerations(atom_masses, atom_crds, bond_pairs, bond_params, box_size)  # calculate initial accelerations
     system_energy = calculate_energy(atom_masses, atom_crds, atom_vels, bond_pairs, bond_params, box_size)  # calculate initial energies
     write_output_files(0, num_atoms, atom_names, atom_crds, system_energy)
 
-
     # Molecular dynamics
-    # print("Performing molecular dynamics simulation")
-    # for step in range(1, num_steps+1):
+    print("Performing molecular dynamics simulation")
+    for step in range(1, num_steps+1):
+        # Velocity - Verlet algorithm
+        atom_crds = update_coordinates(atom_crds, atom_acc_start, atom_vels, time_step, box_size)
+        atom_acc_end = update_accelerations(atom_masses, atom_crds, bond_pairs, bond_params, box_size)
+        atom_vels = update_velocities(atom_vels, atom_acc_start, atom_acc_end, time_step)
+        atom_acc_start = atom_acc_end
+        # Write coordinates and energies
+        if step % write_steps == 0:
+            system_energy = calculate_energy(atom_masses, atom_crds, atom_vels, bond_pairs, bond_params, box_size)
+            write_output_files(step, num_atoms, atom_names, atom_crds, system_energy)
+            print("Completion: {:.3f}%".format(100 * float(step) / num_steps))
+    print_dashed_line()
+    print("Simulation complete \nCoordinates written to coordinates.xyz \nEnergies written to energies.dat")
+    print_dashed_line()
 
-
-
-
-
-    # print(num_steps, write_steps)
 
 # Execute code if main file
 if __name__ == "__main__":

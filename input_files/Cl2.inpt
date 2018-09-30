@@ -2,9 +2,9 @@
 Molecule Name: Cl2
 -------------------------------------------------
 Simulation Parameters
-1000        Total time (ps)
+100        Total time (ps)
 0.01        Time step (ps)
-10.0        Box size (Angstrom)
+100.0        Box size (Angstrom)
 0.05        Coordinate/energy write frequency (ps)
 -------------------------------------------------
 Atom Data
