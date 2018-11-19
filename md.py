@@ -21,6 +21,7 @@ bohr = 0.52917721067       # Angstroms
 hbar = 6.626070040e-34     # Js
 atomic_time = hbar / hartree
 
+
 # Global files to prevent constant opening/closing
 xyz_file = open("coordinates.xyz", "w")
 energy_file = open("energies.dat", "w")
@@ -66,7 +67,7 @@ def get_input_parameters():
         while True:
             print("Select an input file from the list:")
             for i, file in enumerate(input_files):
-                print("[{0}]  {1}".format(i,file))
+                print("[{0}]  {1}".format(i, file))
             try:
                 user_selection = int(input())
                 input_file = input_files[user_selection]
@@ -236,7 +237,7 @@ def write_output_files(time_step, num_atoms, names, crds, energies):
         xyz_file.write("{0}  {1:.6f}  {2:.6f}  {3:.6f}  \n".format(names[i], xyz[0], xyz[1], xyz[2]))
 
     # Write energies
-    energy = energies * 1e3 * hartree
+    energy = energies * hartree * avo * 1e-3
     energy_file.write("{0}  {1}  {2}  {3}  \n".format(time_step, energy[0], energy[1], energy[2]))
 
 
@@ -296,4 +297,3 @@ def main():
 # Execute code if main file
 if __name__ == "__main__":
     main()
-
